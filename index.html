@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="恋爱小日记">
 <meta name="theme-color" content="#e56b8c">
-<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23ff7ea0'/><text x='50' y='62' font-size='50' text-anchor='middle' fill='white'>💕</text></svg>">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23ff7ea0' /><text x='50' y='62' font-size='50' text-anchor='middle' fill='white'>💕</text></svg>">
 <!-- 云同步通过 JSONBin REST API 直接调用，无需 SDK -->
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -210,12 +210,12 @@
   <div class="modal">
     <h2>⚙️ 云同步设置</h2>
     <p>
-      1. 打开 <b>jsonbin.io</b> 注册（免费，不会暂停账号）；<br>
-      2. 登录后点右上角头像 → <b>API Keys</b>，复制 <b>X-Master-Key</b>，填到下面第一格；<br>
+      1. 打开 <b>jsonbin.io</b>注册；<br>
+      2. 登录后点右上角头像 → <b>API Keys</b>，复制 <b>X‑Master‑Key</b>，填到下面第一格；<br>
       3. 点「保存并连接」，应用会自动创建一个云日记本，并生成一串<b>共享码</b>；<br>
       4. 把这串共享码发给对方，对方在自己的设置里填上 API Key 和共享码，就互通啦。
     </p>
-    <div class="field"><input id="sAppId" placeholder="X-Master-Key（API Key）"></div>
+    <div class="field"><input id="sAppId" placeholder="X‑Master‑Key（API Key）"></div>
     <div class="field"><input id="sAppKey" placeholder="共享码（对方填；第一次自己留空）"></div>
     <div class="field hidden"><input id="sServer" placeholder=""></div>
     <div class="field hidden" id="shareCodeBox"><input id="sShareCode" readonly placeholder=""></div>
@@ -235,22 +235,248 @@ const MOODS = ["😊 开心","🥰 甜甜的","😌 平静","😐 一般","😔 
 let curUser = null;
 let curMood = MOODS[0];
 let cloudReady = false;
-let entries = [];   // {objectId?, user, date, mood, happy, sad, msg, extra, ts}
-/* ---------- 本地缓存 ---------- */
+let entries = [];
+
 function loadLocal(){
   try { entries = JSON.parse(localStorage.getItem("loveDiaryEntries")) || []; }
   catch(e){ entries = []; }
 }
 function saveLocal(){ localStorage.setItem("loveDiaryEntries", JSON.stringify(entries)); }
-/* ---------- JSONBin 云同步 ---------- */
+
 function getCfg(){
   try { return JSON.parse(localStorage.getItem("loveDiaryCloudCfg")) || {}; }
   catch(e){ return {}; }
+}
+function setCfg(obj){
+  const old = getCfg();
+  localStorage.setItem("loveDiaryCloudCfg", JSON.stringify({...old,...obj}));
 }
 function initCloud(){
   const c = getCfg();
   cloudReady = !!(c.apiKey && c.binId);
 }
-async function jbFetch(path, opts){
+
+async function jbFetch(path, opts={}){
   const c = getCfg();
-  const res = await fetch("https://api.jsonbin.io/v3" + path, Object.assign
+  const headers = {
+    "X‑Master‑Key": c.apiKey,
+    "Content‑Type":"application/json"
+  };
+  const res = await fetch("https://api.jsonbin.io/v3"+path, Object.assign({headers},opts));
+  if(!res.ok) throw new Error("API错误:"+res.status);
+  return await res.json();
+}
+
+async function createBin(){
+  const json = await jbFetch("/b", {method:"POST", body:JSON.stringify([])});
+  return json.metadata.id;
+}
+async function pullCloud(){
+  const c = getCfg();
+  if(!c.binId) return null;
+  const json = await jbFetch("/b/"+c.binId+"/latest");
+  return json.record;
+}
+async function pushCloud(arr){
+  const c = getCfg();
+  await jbFetch("/b/"+c.binId, {method:"PUT", body:JSON.stringify(arr)});
+}
+
+function showToast(msg){
+  const el = document.getElementById("toast");
+  el.innerText = msg;
+  el.classList.add("show");
+  setTimeout(()=>el.classList.remove("show"),2200);
+}
+
+let selectedUser = "A";
+function pickUser(u, dom){
+  selectedUser = u;
+  document.querySelectorAll(".avatar-btn").forEach(x=>x.classList.remove("active"));
+  dom.classList.add("active");
+}
+
+function login(){
+  const pwd = document.getElementById("pwdInput").value.trim();
+  if(USERS[selectedUser].pwd !== pwd){
+    showToast("密码错误");
+    return;
+  }
+  curUser = selectedUser;
+  document.getElementById("loginPage").classList.add("hidden");
+  document.getElementById("appPage").classList.remove("hidden");
+  document.getElementById("welcomeText").innerText = USERS[curUser].face+" "+USERS[curUser].name;
+  loadLocal();
+  initCloud();
+  renderMoodOptions();
+  renderDiaryList();
+  document.getElementById("fDate").valueAsDate = new Date();
+}
+function logout(){
+  curUser = null;
+  document.getElementById("appPage").classList.add("hidden");
+  document.getElementById("loginPage").classList.remove("hidden");
+}
+
+function openSettings(){
+  const mask = document.getElementById("settingsMask");
+  mask.classList.remove("hidden");
+  const cfg = getCfg();
+  document.getElementById("sAppId").value = cfg.apiKey||"";
+  document.getElementById("sAppKey").value = cfg.binId||"";
+}
+function closeSettings(){
+  document.getElementById("settingsMask").classList.add("hidden");
+}
+
+async function saveSettings(){
+  const apiKey = document.getElementById("sAppId").value.trim();
+  let binId = document.getElementById("sAppKey").value.trim();
+  if(!apiKey){
+    showToast("请填入X‑Master‑Key");
+    return;
+  }
+  setCfg({apiKey});
+  try{
+    if(!binId){
+      binId = await createBin();
+      document.getElementById("sShareCode").value = binId;
+      document.getElementById("shareCodeBox").classList.remove("hidden");
+      showToast("已创建云仓库！把共享码发给对方");
+    }else{
+      showToast("连接共享仓库成功");
+    }
+    setCfg({binId});
+    initCloud();
+    closeSettings();
+  }catch(err){
+    showToast("连接失败："+err.message);
+  }
+}
+
+function switchTab(mode){
+  const write = document.getElementById("writePanel");
+  const list = document.getElementById("listPanel");
+  document.getElementById("tabWrite").classList.toggle("active",mode==="write");
+  document.getElementById("tabList").classList.toggle("active",mode==="list");
+  if(mode==="write"){
+    write.classList.remove("hidden");
+    list.classList.add("hidden");
+  }else{
+    write.classList.add("hidden");
+    list.classList.remove("hidden");
+    renderDiaryList();
+    syncPull();
+  }
+}
+
+function renderMoodOptions(){
+  const wrap = document.getElementById("moodRow");
+  wrap.innerHTML = "";
+  MOODS.forEach(m=>{
+    const btn = document.createElement("button");
+    btn.className = "mood‑opt"+(curMood===m?" active":"");
+    btn.innerText = m;
+    btn.onclick = ()=>{
+      curMood = m;
+      renderMoodOptions();
+    };
+    wrap.appendChild(btn);
+  })
+}
+
+async function syncPull(){
+  const statusDom = document.getElementById("syncStatus");
+  if(!cloudReady){ statusDom.innerText="本地模式，未开启云同步"; return; }
+  try{
+    statusDom.innerText="正在同步云端…";
+    const cloudArr = await pullCloud();
+    if(cloudArr && Array.isArray(cloudArr)){
+      const merge = [...entries,...cloudArr];
+      const map = new Map();
+      merge.forEach(it=>map.set(it.ts,it));
+      entries = Array.from(map.values()).sort((a,b)=>b.ts‑a.ts);
+      saveLocal();
+      renderDiaryList();
+      statusDom.innerText="✅同步完成";
+    }
+  }catch(e){
+    statusDom.innerText="⚠️同步失败";
+  }
+}
+async function syncPush(){
+  if(!cloudReady) return;
+  try{
+    await pushCloud(entries);
+  }catch(e){
+    showToast("云端保存失败");
+  }
+}
+
+async function saveDiary(){
+  const date = document.getElementById("fDate").value;
+  const happy = document.getElementById("fHappy").value.trim();
+  const sad = document.getElementById("fSad").value.trim();
+  const msg = document.getElementById("fMsg").value.trim();
+  const extra = document.getElementById("fExtra").value.trim();
+  if(!date){ showToast("请填写日期"); return; }
+  const item = {
+    user:curUser,
+    date,
+    mood:curMood,
+    happy,sad,msg,extra,
+    ts:Date.now()
+  };
+  entries.unshift(item);
+  saveLocal();
+  await syncPush();
+  showToast("保存成功💗");
+  document.getElementById("fHappy").value="";
+  document.getElementById("fSad").value="";
+  document.getElementById("fMsg").value="";
+  document.getElementById("fExtra").value="";
+  renderDiaryList();
+}
+
+function renderDiaryList(){
+  const dom = document.getElementById("diaryList");
+  if(entries.length===0){
+    dom.innerHTML = `<div class="empty"><span class="big">📒</span>还没有日记，写下第一篇吧</div>`;
+    return;
+  }
+  dom.innerHTML = "";
+  entries.slice().sort((a,b)=>b.ts‑a.ts).forEach(it=>{
+    const isMe = it.user === curUser;
+    const userInfo = USERS[it.user];
+    const div = document.createElement("div");
+    div.className = "diary‑item";
+    div.innerHTML = `
+      <button class="del‑btn" ${!isMe?"disabled style='opacity:0.1'":""} onclick="delItem(${it.ts})">🗑</button>
+      <div class="diary‑head">
+        <span class="diary‑date">${it.date}</span>
+        <span class="diary‑mood">${it.mood}</span>
+        <span class="badge ${isMe?'me':'partner'}">${userInfo.face} ${userInfo.name}</span>
+      </div>
+      ${it.happy?`<div class="diary‑sec"><span class="tag happy">开心</span>${it.happy}</div>`:""}
+      ${it.sad?`<div class="diary‑sec"><span class="tag sad">烦心</span>${it.sad}</div>`:""}
+      ${it.msg?`<div class="letter‑box"><span class="tag msg">悄悄话</span>${it.msg}</div>`:""}
+      ${it.extra?`<div class="diary‑sec">✨ ${it.extra}</div>`:""}
+    `;
+    dom.appendChild(div);
+  })
+}
+
+async function delItem(ts){
+  entries = entries.filter(x=>x.ts!==ts);
+  saveLocal();
+  await syncPush();
+  renderDiaryList();
+  showToast("已删除");
+}
+
+window.onload = function(){
+  loadLocal();
+}
+</script>
+</body>
+</html>
