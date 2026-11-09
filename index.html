@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>恋爱小日记 💕</title>
+<!-- =====增加桌面图标配置（PWA）===== -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="恋爱小日记">
+<meta name="theme-color" content="#e56b8c">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23ff7ea0'/><text x='50' y='62' font-size='50' text-anchor='middle' fill='white'>💕</text></svg>">
+<!-- 云同步通过 JSONBin REST API 直接调用，无需 SDK -->
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: "PingFang SC","Microsoft YaHei",sans-serif;
+    background: linear-gradient(135deg,#ffe8f0 0%,#fff4e6 50%,#ffe8f0 100%);
+    min-height:100vh; color:#5b4a56;
+  }
+  .hidden{display:none!important;}
+  /* ---------- 登录页 ---------- */
+  #loginPage{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+  .login-card{
+    background:#fff;border-radius:24px;box-shadow:0 12px 40px rgba(255,150,180,.25);
+    padding:40px 36px;width:100%;max-width:380px;text-align:center;
+  }
+  .login-card h1{font-size:26px;color:#e56b8c;margin-bottom:6px;}
+  .login-card .sub{color:#b59aa6;font-size:14px;margin-bottom:28px;}
+  .avatar-row{display:flex;gap:16px;justify-content:center;margin-bottom:24px;}
+  .avatar-btn{
+    width:110px;padding:14px 6px;border-radius:18px;border:2px solid #f3d7e0;background:#fffdfa;
+    cursor:pointer;font-size:14px;color:#8a6b7a;transition:.2s;
+  }
+  .avatar-btn .face{font-size:30px;display:block;margin-bottom:6px;}
+  .avatar-btn.active{border-color:#e56b8c;background:#fff0f5;color:#e56b8c;transform:translateY(-3px);box-shadow:0 6px 16px rgba(229,107,140,.25);}
+  .login-card input{
+    width:100%;padding:12px 16px;border:2px solid #f3d7e0;border-radius:14px;font-size:15px;
+    margin-bottom:14px;outline:none;color:#5b4a56;
+  }
+  .login-card input:focus{border-color:#e56b8c;}
+  .btn-main{
+    width:100%;padding:13px;border:none;border-radius:14px;background:linear-gradient(135deg,#ff7ea0,#ff9e80);
+    color:#fff;font-size:16px;cursor:pointer;letter-spacing:2px;transition:.2s;
+  }
+  .btn-main:hover{opacity:.9;transform:translateY(-1px);}
+  .btn-ghost{
+    width:100%;padding:11px;margin-top:10px;border:2px solid #f3d7e0;border-radius:14px;
+    background:#fff;color:#c08a9c;font-size:13px;cursor:pointer;
+  }
+  .login-hint{margin-top:16px;font-size:12px;color:#c4aeb8;line-height:1.6;}
+  /* ---------- 主界面 ---------- */
+  header{
+    background:rgba(255,255,255,.85);backdrop-filter:blur(8px);
+    padding:14px 22px;display:flex;align-items:center;justify-content:space-between;
+    box-shadow:0 2px 12px rgba(255,150,180,.15);position:sticky;top:0;z-index:10;
+  }
+  header h1{font-size:20px;color:#e56b8c;}
+  .user-chip{display:flex;align-items:center;gap:10px;font-size:14px;color:#8a6b7a;}
+  .user-chip button{
+    border:none;background:#fff0f5;color:#e56b8c;border-radius:10px;padding:7px 14px;cursor:pointer;font-size:13px;
+  }
+  .container{max-width:760px;margin:0 auto;padding:24px 18px 80px;}
+  .tabs{display:flex;gap:10px;margin-bottom:22px;}
+  .tab{
+    flex:1;padding:12px;border:none;border-radius:14px;background:#fff;color:#a07d8c;
+    font-size:15px;cursor:pointer;box-shadow:0 2px 8px rgba(255,150,180,.12);transition:.2s;
+  }
+  .tab.active{background:linear-gradient(135deg,#ff7ea0,#ff9e80);color:#fff;}
+  .sync-status{font-size:12px;color:#b59aa6;text-align:center;margin-bottom:14px;min-height:16px;}
+  /* 表单卡片 */
+  .card{background:#fff;border-radius:20px;box-shadow:0 6px 24px rgba(255,150,180,.15);padding:26px;margin-bottom:24px;}
+  .card h2{font-size:17px;color:#e56b8c;margin-bottom:16px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:13px;color:#a07d8c;margin-bottom:6px;}
+  .field input,.field textarea,.field select{
+    width:100%;padding:11px 14px;border:2px solid #f3d7e0;border-radius:12px;font-size:14px;
+    outline:none;font-family:inherit;color:#5b4a56;background:#fffdfa;
+  }
+  .field textarea{resize:vertical;min-height:70px;}
+  .field input:focus,.field textarea:focus{border-color:#e56b8c;}
+  .mood-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .mood-opt{
+    font-size:26px;padding:8px 12px;border-radius:12px;border:2px solid transparent;cursor:pointer;
+    background:#fff8fa;transition:.15s;
+  }
+  .mood-opt.active{border-color:#e56b8c;background:#fff0f5;transform:scale(1.12);}
+  .save-btn{
+    width:100%;padding:13px;border:none;border-radius:14px;
+    background:linear-gradient(135deg,#ff7ea0,#ff9e80);color:#fff;font-size:15px;cursor:pointer;letter-spacing:2px;
+  }
+  .save-btn:disabled{opacity:.6;cursor:wait;}
+  /* 日记列表 */
+  .diary-item{background:#fff;border-radius:18px;box-shadow:0 4px 16px rgba(255,150,180,.12);padding:20px;margin-bottom:16px;position:relative;}
+  .diary-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px;}
+  .diary-date{font-weight:600;color:#e56b8c;font-size:15px;}
+  .badge{font-size:12px;padding:4px 10px;border-radius:999px;}
+  .badge.me{background:#fff0f5;color:#e56b8c;}
+  .badge.partner{background:#eef4ff;color:#6b8ce5;}
+  .diary-mood{font-size:22px;margin-right:6px;}
+  .diary-sec{margin:8px 0;font-size:14px;line-height:1.7;}
+  .diary-sec .tag{display:inline-block;font-size:12px;color:#fff;border-radius:6px;padding:2px 8px;margin-right:8px;vertical-align:1px;}
+  .tag.happy{background:#ffb36b;}
+  .tag.sad{background:#8fb8e8;}
+  .tag.msg{background:#ff8fae;}
+  .letter-box{
+    background:#fff0f5;border-left:4px solid #ff8fae;border-radius:0 12px 12px 0;
+    padding:12px 14px;margin-top:12px;font-size:14px;line-height:1.8;color:#8a5568;font-style:italic;
+  }
+  .del-btn{position:absolute;top:14px;right:16px;border:none;background:none;cursor:pointer;font-size:15px;opacity:.35;}
+  .del-btn:hover{opacity:1;}
+  .empty{text-align:center;color:#c4aeb8;padding:50px 0;font-size:14px;}
+  .empty .big{font-size:44px;display:block;margin-bottom:12px;}
+  /* 设置弹窗 */
+  .modal-mask{
+    position:fixed;inset:0;background:rgba(90,60,75,.4);z-index:50;
+    display:flex;align-items:center;justify-content:center;padding:20px;
+  }
+  .modal{background:#fff;border-radius:20px;padding:30px;width:100%;max-width:420px;}
+  .modal h2{font-size:18px;color:#e56b8c;margin-bottom:8px;}
+  .modal p{font-size:13px;color:#a07d8c;line-height:1.7;margin-bottom:16px;}
+  .modal .field input{font-size:13px;}
+  .modal .btns{display:flex;gap:10px;margin-top:6px;}
+  .modal .btns button{flex:1;padding:11px;border-radius:12px;font-size:14px;cursor:pointer;border:none;}
+  .btn-cancel{background:#f3eef1;color:#8a6b7a;}
+  .btn-ok{background:linear-gradient(135deg,#ff7ea0,#ff9e80);color:#fff;}
+  .toast{
+    position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(80px);
+    background:#e56b8c;color:#fff;padding:11px 26px;border-radius:999px;font-size:14px;
+    opacity:0;transition:.3s;z-index:99;box-shadow:0 6px 20px rgba(229,107,140,.4);
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<!-- 登录页 -->
+<div id="loginPage">
+  <div class="login-card">
+    <h1>💕 恋爱小日记</h1>
+    <p class="sub">记录拿铁和芋泥紫薯的每一天</p>
+    <div class="avatar-row">
+      <button class="avatar-btn active" data-user="A" onclick="pickUser('A',this)">
+        <span class="face">☕</span>拿铁
+      </button>
+      <button class="avatar-btn" data-user="B" onclick="pickUser('B',this)">
+        <span class="face">🍠</span>芋泥紫薯
+      </button>
+    </div>
+    <input type="password" id="pwdInput" placeholder="请输入密码（默认：1234）" maxlength="20">
+    <button class="btn-main" onclick="login()">进入我们的小世界</button>
+    <button class="btn-ghost" onclick="openSettings()">⚙️ 云同步设置</button>
+    <p class="login-hint" id="loginHint">首次使用请点「云同步设置」填入 jsonbin.io 的 API Key，两人填同一套即可互通</p>
+  </div>
+</div>
+<!-- 主界面 -->
+<div id="appPage" class="hidden">
+  <header>
+    <h1>💕 恋爱小日记</h1>
+    <div class="user-chip">
+      <span id="welcomeText"></span>
+      <button onclick="openSettings()">⚙️</button>
+      <button onclick="logout()">退出</button>
+    </div>
+  </header>
+  <div class="container">
+    <div class="tabs">
+      <button class="tab active" id="tabWrite" onclick="switchTab('write')">✍️ 写日记</button>
+      <button class="tab" id="tabList" onclick="switchTab('list')">📖 我们的日记</button>
+    </div>
+    <div class="sync-status" id="syncStatus"></div>
+    <!-- 写日记 -->
+    <div id="writePanel">
+      <div class="card">
+        <h2>今天的记录 🌸</h2>
+        <div class="field">
+          <label>📅 日期</label>
+          <input type="date" id="fDate">
+        </div>
+        <div class="field">
+          <label>😊 今天的心情</label>
+          <div class="mood-row" id="moodRow"></div>
+        </div>
+        <div class="field">
+          <label>🌈 今天发生的开心的事情</label>
+          <textarea id="fHappy" placeholder="哪怕是很小的事，也值得记下来～"></textarea>
+        </div>
+        <div class="field">
+          <label>🌧️ 今天发生的悲伤/烦心的事情</label>
+          <textarea id="fSad" placeholder="说出来会好受一点，我在听…"></textarea>
+        </div>
+        <div class="field">
+          <label>💌 想和对方说的话</label>
+          <textarea id="fMsg" placeholder="有些话，写下来比说出口更温柔…"></textarea>
+        </div>
+        <div class="field">
+          <label>✨ 今日碎碎念（可选）</label>
+          <input type="text" id="fExtra" placeholder="其它想记下的小事、小心情…">
+        </div>
+        <button class="save-btn" id="saveBtn" onclick="saveDiary()">保存今天 💗</button>
+      </div>
+    </div>
+    <!-- 日记列表 -->
+    <div id="listPanel" class="hidden">
+      <div id="diaryList"></div>
+    </div>
+  </div>
+</div>
+<!-- 设置弹窗 -->
+<div class="modal-mask hidden" id="settingsMask">
+  <div class="modal">
+    <h2>⚙️ 云同步设置</h2>
+    <p>
+      1. 打开 <b>jsonbin.io</b> 注册（免费，不会暂停账号）；<br>
+      2. 登录后点右上角头像 → <b>API Keys</b>，复制 <b>X-Master-Key</b>，填到下面第一格；<br>
+      3. 点「保存并连接」，应用会自动创建一个云日记本，并生成一串<b>共享码</b>；<br>
+      4. 把这串共享码发给对方，对方在自己的设置里填上 API Key 和共享码，就互通啦。
+    </p>
+    <div class="field"><input id="sAppId" placeholder="X-Master-Key（API Key）"></div>
+    <div class="field"><input id="sAppKey" placeholder="共享码（对方填；第一次自己留空）"></div>
+    <div class="field hidden"><input id="sServer" placeholder=""></div>
+    <div class="field hidden" id="shareCodeBox"><input id="sShareCode" readonly placeholder=""></div>
+    <div class="btns">
+      <button class="btn-cancel" onclick="closeSettings()">取消</button>
+      <button class="btn-ok" onclick="saveSettings()">保存并连接</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const USERS = {
+  A: { name: "拿铁", face: "☕", pwd: "1234" },
+  B: { name: "芋泥紫薯", face: "🍠", pwd: "1234" }
+};
+const MOODS = ["😊 开心","🥰 甜甜的","😌 平静","😐 一般","😔 有点低落","😭 难过","😤 烦躁","🤒 不舒服"];
+let curUser = null;
+let curMood = MOODS[0];
+let cloudReady = false;
+let entries = [];   // {objectId?, user, date, mood, happy, sad, msg, extra, ts}
+/* ---------- 本地缓存 ---------- */
+function loadLocal(){
+  try { entries = JSON.parse(localStorage.getItem("loveDiaryEntries")) || []; }
+  catch(e){ entries = []; }
+}
+function saveLocal(){ localStorage.setItem("loveDiaryEntries", JSON.stringify(entries)); }
+/* ---------- JSONBin 云同步 ---------- */
+function getCfg(){
+  try { return JSON.parse(localStorage.getItem("loveDiaryCloudCfg")) || {}; }
+  catch(e){ return {}; }
+}
+function initCloud(){
+  const c = getCfg();
+  cloudReady = !!(c.apiKey && c.binId);
+}
+async function jbFetch(path, opts){
+  const c = getCfg();
+  const res = await fetch("https://api.jsonbin.io/v3" + path, Object.assign
